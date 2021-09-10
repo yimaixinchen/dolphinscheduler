@@ -49,7 +49,7 @@ public class AlertRequestProcessor implements NettyRequestProcessor {
     public void process(Channel channel, Command command) {
         Preconditions.checkArgument(CommandType.ALERT_SEND_REQUEST == command.getType(),
                 String.format("invalid command type : %s", command.getType()));
-
+        //new Computer
         AlertSendRequestCommand alertSendRequestCommand = JsonSerializer.deserialize(
                 command.getBody(), AlertSendRequestCommand.class);
         logger.info("received command : {}", alertSendRequestCommand);
