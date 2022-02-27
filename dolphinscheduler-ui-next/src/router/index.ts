@@ -19,9 +19,13 @@ import {
   createRouter,
   createWebHistory,
   NavigationGuardNext,
-  RouteLocationNormalized,
+  RouteLocationNormalized
 } from 'vue-router'
 import routes from './routes'
+
+import { useMenuStore } from '@/store/menu/menu'
+import { useUserStore } from '@/store/user/user'
+import type { UserInfoRes } from '@/service/modules/users/types'
 
 // NProgress
 import NProgress from 'nprogress'
@@ -29,8 +33,14 @@ import 'nprogress/nprogress.css'
 
 const router = createRouter({
   history: createWebHistory(),
-  routes,
+  routes
 })
+
+interface metaData {
+  title?: string
+  showSide?: boolean
+  auth?: Array<string>
+}
 
 /**
  * Routing to intercept
@@ -42,7 +52,21 @@ router.beforeEach(
     next: NavigationGuardNext
   ) => {
     NProgress.start()
-    next()
+    const menuStore = useMenuStore()
+    const userStore = useUserStore()
+    const metaData: metaData = to.meta
+    menuStore.setShowSideStatus(metaData.showSide || false)
+    if (
+      metaData.auth?.includes('ADMIN_USER') &&
+      (userStore.getUserInfo as UserInfoRes).userType !== 'ADMIN_USER' &&
+      menuStore.getMenuKey === 'security'
+    ) {
+      to.fullPath = '/security/token-manage'
+      next({ name: 'token-manage' })
+    } else {
+      next()
+    }
+
     NProgress.done()
   }
 )

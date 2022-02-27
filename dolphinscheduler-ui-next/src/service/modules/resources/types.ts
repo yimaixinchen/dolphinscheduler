@@ -21,6 +21,7 @@ interface FileReq {
 
 interface ResourceTypeReq {
   type: 'FILE' | 'UDF'
+  programType?: string
 }
 
 interface UdfTypeReq {
@@ -83,11 +84,33 @@ interface ResourceIdReq {
   resourceId: number
 }
 
-interface UdfFuncReq extends UdfTypeReq, DescriptionReq {
+interface UdfFuncReq extends UdfTypeReq, DescriptionReq, ResourceIdReq {
   className: string
   funcName: string
   argTypes?: string
   database?: string
+}
+
+interface ResourceFile {
+  id: number
+  pid: number
+  alias: string
+  userId: number
+  type: string
+  directory: boolean
+  fileName: string
+  fullName: string
+  description: string
+  size: number
+  updateTime: string
+}
+
+interface ResourceListRes {
+  currentPage: number
+  pageSize: number
+  start: number
+  total: number
+  totalList: ResourceFile[]
 }
 
 export {
@@ -108,4 +131,5 @@ export {
   ViewResourceReq,
   ResourceIdReq,
   UdfFuncReq,
+  ResourceListRes
 }
