@@ -17,7 +17,7 @@
 
 import { useAsyncState } from '@vueuse/core'
 import { reactive, h, ref } from 'vue'
-import { NButton, NTooltip } from 'naive-ui'
+import { NButton, NIcon, NTooltip } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { queryQueueListPaging } from '@/service/modules/queues'
 import { EditOutlined } from '@vicons/antd'
@@ -36,7 +36,8 @@ export function useTable() {
     variables.columns = [
       {
         title: '#',
-        key: 'index'
+        key: 'index',
+        render: (row: any, index: number) => index + 1
       },
       {
         title: t('security.yarn_queue.queue_name'),
@@ -76,7 +77,8 @@ export function useTable() {
                     }
                   },
                   {
-                    icon: () => h(EditOutlined)
+                    icon: () =>
+                      h(NIcon, null, { default: () => h(EditOutlined) })
                   }
                 ),
               default: () => t('security.yarn_queue.edit')
@@ -96,19 +98,22 @@ export function useTable() {
     totalPage: ref(1),
     showModalRef: ref(false),
     statusRef: ref(0),
-    row: {}
+    row: {},
+    loadingRef: ref(false)
   })
 
   const getTableData = (params: any) => {
+    if (variables.loadingRef) return
+    variables.loadingRef = true
     const { state } = useAsyncState(
       queryQueueListPaging({ ...params }).then((res: QueueRes) => {
-        variables.tableData = res.totalList.map((item, index) => {
+        variables.tableData = res.totalList.map((item, unused) => {
           return {
-            index: index + 1,
             ...item
           }
         }) as any
         variables.totalPage = res.totalPage
+        variables.loadingRef = false
       }),
       {}
     )

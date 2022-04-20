@@ -38,9 +38,7 @@ type IType =
   | 'custom'
   | 'multi-condition'
 
-interface IOption extends SelectOption, TreeSelectOption {
-  label: string
-}
+type IOption = SelectOption | TreeSelectOption
 
 interface IFormItem {
   showLabel?: boolean
@@ -57,10 +55,10 @@ interface IMeta extends Omit<FormProps, 'model'> {
   model: object
 }
 
-interface IJsonItem {
+interface IJsonItemParams {
   field: string
   name?: string
-  props?: object
+  props?: any
   title?: string
   type?: IType
   validate?: FormItemRule
@@ -73,6 +71,10 @@ interface IJsonItem {
   class?: string
 }
 
+type IJsonItemFn = (i?: number) => IJsonItemParams
+
+type IJsonItem = IJsonItemParams | IJsonItemFn
+
 export {
   IMeta,
   IType,
@@ -81,5 +83,6 @@ export {
   FormItemRule,
   FormRules,
   IFormItem,
-  GridProps
+  GridProps,
+  IJsonItemParams
 }

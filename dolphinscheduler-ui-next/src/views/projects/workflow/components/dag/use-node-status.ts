@@ -15,15 +15,16 @@
  * limitations under the License.
  */
 
-import type { Ref } from 'vue'
-import { render, h } from 'vue'
+import { render, h, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import type { Graph } from '@antv/x6'
 import { tasksState } from '@/utils/common'
 import { NODE, NODE_STATUS_MARKUP } from './dag-config'
 import { queryTaskListByProcessId } from '@/service/modules/process-instances'
 import NodeStatus from '@/views/projects/workflow/components/dag/dag-node-status'
+import type { IWorkflowTaskInstance, ITaskState } from './types'
+import type { Graph } from '@antv/x6'
+import type { Ref } from 'vue'
 
 interface Options {
   graph: Ref<Graph | undefined>
@@ -35,10 +36,15 @@ interface Options {
 export function useNodeStatus(options: Options) {
   const { graph } = options
   const route = useRoute()
+  const taskList = ref<Array<IWorkflowTaskInstance>>([])
 
   const { t } = useI18n()
 
-  const setNodeStatus = (code: string, state: string, taskInstance: any) => {
+  const setNodeStatus = (
+    code: string,
+    state: ITaskState,
+    taskInstance: any
+  ) => {
     const stateProps = tasksState(t)[state]
     const node = graph.value?.getCellById(code)
     if (node) {
@@ -66,9 +72,9 @@ export function useNodeStatus(options: Options) {
 
     queryTaskListByProcessId(instanceId, projectCode).then((res: any) => {
       window.$message.success(t('project.workflow.refresh_status_succeeded'))
-      const { taskList } = res
-      if (taskList) {
-        taskList.forEach((taskInstance: any) => {
+      taskList.value = res.taskList
+      if (taskList.value) {
+        taskList.value.forEach((taskInstance: any) => {
           setNodeStatus(taskInstance.taskCode, taskInstance.state, taskInstance)
         })
       }
@@ -76,6 +82,7 @@ export function useNodeStatus(options: Options) {
   }
 
   return {
+    taskList,
     refreshTaskStatus
   }
 }

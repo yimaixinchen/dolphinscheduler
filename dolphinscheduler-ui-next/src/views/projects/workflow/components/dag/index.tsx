@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import type { Graph } from '@antv/x6'
+import type { Cell, Graph } from '@antv/x6'
 import {
   defineComponent,
   ref,
@@ -23,9 +23,11 @@ import {
   PropType,
   toRef,
   watch,
-  onBeforeUnmount
+  onBeforeUnmount,
+  computed
 } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import DagToolbar from './dag-toolbar'
 import DagCanvas from './dag-canvas'
 import DagSidebar from './dag-sidebar'
@@ -42,17 +44,21 @@ import {
 } from './dag-hooks'
 import { useThemeStore } from '@/store/theme/theme'
 import VersionModal from '../../definition/components/version-modal'
-import { WorkflowDefinition } from './types'
+import { WorkflowDefinition, WorkflowInstance } from './types'
 import DagSaveModal from './dag-save-modal'
+import ContextMenuItem from './dag-context-menu'
 import TaskModal from '@/views/projects/task/components/node/detail-modal'
 import StartModal from '@/views/projects/workflow/definition/components/start-modal'
-import ContextMenuItem from './dag-context-menu'
+import LogModal from '@/components/log-modal'
 import './x6-style.scss'
+import { queryLog } from '@/service/modules/log'
+import { useAsyncState } from '@vueuse/core'
+import { downloadFile } from '@/service/service'
 
 const props = {
   // If this prop is passed, it means from definition detail
   instance: {
-    type: Object as PropType<any>,
+    type: Object as PropType<WorkflowInstance>,
     default: undefined
   },
   definition: {
@@ -75,6 +81,7 @@ export default defineComponent({
   emits: ['refresh', 'save'],
   setup(props, context) {
     const { t } = useI18n()
+    const route = useRoute()
     const theme = useThemeStore()
 
     // Whether the graph can be operated
@@ -102,25 +109,69 @@ export default defineComponent({
       appendTask,
       editTask,
       copyTask,
-      taskDefinitions,
+      processDefinition,
       removeTasks
     } = useTaskEdit({ graph, definition: toRef(props, 'definition') })
 
     // Right click cell
-    const {
-      menuCell,
-      pageX,
-      pageY,
-      menuVisible,
-      startModalShow,
-      menuHide,
-      menuStart
-    } = useNodeMenu({
+    const { nodeVariables, menuHide, menuStart, viewLog } = useNodeMenu({
       graph
     })
 
+    // start button in the dag node menu
+    const startReadonly = computed(() => {
+      if (props.definition) {
+        return (
+          route.name === 'workflow-definition-detail' &&
+          props.definition!.processDefinition.releaseState === 'NOT_RELEASE'
+        )
+      } else {
+        return false
+      }
+    })
+
+    // other button in the dag node menu
+    const menuReadonly = computed(() => {
+      if (props.instance) {
+        return (
+          props.instance.state !== 'WAITING_THREAD' &&
+          props.instance.state !== 'SUCCESS' &&
+          props.instance.state !== 'PAUSE' &&
+          props.instance.state !== 'FAILURE' &&
+          props.instance.state !== 'STOP'
+        )
+      } else if (props.definition) {
+        return props.definition!.processDefinition.releaseState === 'ONLINE'
+      } else {
+        return false
+      }
+    })
+
+    const taskInstance = computed(() => {
+      if (nodeVariables.menuCell) {
+        const taskCode = Number(nodeVariables.menuCell!.id)
+        return taskList.value.find((task: any) => task.taskCode === taskCode)
+      } else {
+        return undefined
+      }
+    })
+
+    const currentTaskInstance = ref()
+
+    watch(
+      () => taskModalVisible.value,
+      () => {
+        if (props.instance && taskModalVisible.value) {
+          const taskCode = currTask.value.code
+          currentTaskInstance.value = taskList.value.find(
+            (task: any) => task.taskCode === taskCode
+          )
+        }
+      }
+    )
+
     const statusTimerRef = ref()
-    const { refreshTaskStatus } = useNodeStatus({ graph })
+    const { taskList, refreshTaskStatus } = useNodeStatus({ graph })
 
     const { onDragStart, onDrop } = useDagDragAndDrop({
       graph,
@@ -163,10 +214,14 @@ export default defineComponent({
         saveModelToggle(false)
         return
       }
-      const connects = getConnects(nodes, edges, taskDefinitions.value as any)
+      const connects = getConnects(
+        nodes,
+        edges,
+        processDefinition.value.taskDefinitionList as any
+      )
       const locations = getLocations(nodes)
       context.emit('save', {
-        taskDefinitions: taskDefinitions.value,
+        taskDefinitions: processDefinition.value.taskDefinitionList,
         saveForm,
         connects,
         locations
@@ -174,12 +229,57 @@ export default defineComponent({
       saveModelToggle(false)
     }
 
+    const handleViewLog = (taskId: number, taskType: string) => {
+      taskModalVisible.value = false
+      viewLog(taskId, taskType)
+      getLogs()
+    }
+
+    const getLogs = () => {
+      const { state } = useAsyncState(
+        queryLog({
+          taskInstanceId: nodeVariables.logTaskId,
+          limit: nodeVariables.limit,
+          skipLineNum: nodeVariables.skipLineNum
+        }).then((res: string) => {
+          nodeVariables.logRef += res
+          if (res) {
+            nodeVariables.limit += 1000
+            nodeVariables.skipLineNum += 1000
+            getLogs()
+          } else {
+            nodeVariables.logLoadingRef = false
+          }
+        }),
+        {}
+      )
+
+      return state
+    }
+
+    const refreshLogs = () => {
+      nodeVariables.logRef = ''
+      nodeVariables.limit = 1000
+      nodeVariables.skipLineNum = 0
+      getLogs()
+    }
+
+    const downloadLogs = () => {
+      downloadFile('log/download-log', {
+        taskInstanceId: nodeVariables.logTaskId
+      })
+    }
+
+    const onConfirmModal = () => {
+      nodeVariables.showModalRef = false
+    }
+
     watch(
       () => props.definition,
       () => {
         if (props.instance) {
           refreshTaskStatus()
-          statusTimerRef.value = setInterval(() => refreshTaskStatus(), 9000)
+          statusTimerRef.value = setInterval(() => refreshTaskStatus(), 90000)
         }
       }
     )
@@ -224,31 +324,51 @@ export default defineComponent({
           v-model:show={saveModalShow.value}
           onSave={onSave}
           definition={props.definition}
+          instance={props.instance}
         />
         <TaskModal
           readonly={props.readonly}
           show={taskModalVisible.value}
           projectCode={props.projectCode}
+          processInstance={props.instance}
+          taskInstance={currentTaskInstance.value}
+          onViewLog={handleViewLog}
           data={currTask.value as any}
+          definition={processDefinition}
           onSubmit={taskConfirm}
           onCancel={taskCancel}
         />
         <ContextMenuItem
-          cell={menuCell.value}
-          visible={menuVisible.value}
-          left={pageX.value}
-          top={pageY.value}
-          releaseState={props.definition?.processDefinition.releaseState}
+          startReadonly={startReadonly.value}
+          menuReadonly={menuReadonly.value}
+          taskInstance={taskInstance.value}
+          cell={nodeVariables.menuCell as Cell}
+          visible={nodeVariables.menuVisible}
+          left={nodeVariables.pageX}
+          top={nodeVariables.pageY}
           onHide={menuHide}
           onStart={menuStart}
           onEdit={editTask}
           onCopyTask={copyTask}
           onRemoveTasks={removeTasks}
+          onViewLog={viewLog}
         />
         {!!props.definition && (
           <StartModal
             v-model:row={props.definition.processDefinition}
-            v-model:show={startModalShow.value}
+            v-model:show={nodeVariables.startModalShow}
+          />
+        )}
+        {!!props.instance && (
+          <LogModal
+            showModalRef={nodeVariables.showModalRef}
+            logRef={nodeVariables.logRef}
+            row={nodeVariables.row}
+            showDownloadLog={true}
+            logLoadingRef={nodeVariables.logLoadingRef}
+            onConfirmModal={onConfirmModal}
+            onRefreshLogs={refreshLogs}
+            onDownloadLogs={downloadLogs}
           />
         )}
       </div>

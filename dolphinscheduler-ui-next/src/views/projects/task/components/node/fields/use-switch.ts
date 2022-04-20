@@ -14,38 +14,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { nextTick, onMounted, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { IJsonItem } from '../types'
+import { useTaskNodeStore } from '@/store/project/task-node'
 import { queryProcessDefinitionByCode } from '@/service/modules/process-definition'
+import type { IJsonItem } from '../types'
 
 export function useSwitch(
   model: { [field: string]: any },
   projectCode: number
 ): IJsonItem[] {
   const { t } = useI18n()
-  const branchFlowOptions = ref([] as any)
-
+  const taskStore = useTaskNodeStore()
+  const branchFlowOptions = ref(taskStore.postTaskOptions as any)
   const loading = ref(false)
-
   const getOtherTaskDefinitionList = async () => {
     if (loading.value) return
     loading.value = true
     branchFlowOptions.value = []
-    try {
-      const res = await queryProcessDefinitionByCode(
-        model.processName,
-        projectCode
-      )
-      res?.taskDefinitionList.forEach((item: any) => {
-        if (item.code != model.code) {
-          branchFlowOptions.value.push({ label: item.name, value: item.code })
-        }
-      })
-      loading.value = false
-    } catch (err) {
-      loading.value = false
-    }
+    const res = await queryProcessDefinitionByCode(
+      model.processName,
+      projectCode
+    )
+    res?.taskDefinitionList.forEach((item: any) => {
+      if (item.code != model.code) {
+        branchFlowOptions.value.push({ label: item.name, value: item.code })
+      }
+    })
+    loading.value = false
   }
 
   watch(

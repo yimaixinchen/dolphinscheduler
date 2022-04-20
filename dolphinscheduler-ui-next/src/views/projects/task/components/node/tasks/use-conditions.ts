@@ -15,8 +15,7 @@
  * limitations under the License.
  */
 
-import { ref, reactive, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { reactive } from 'vue'
 import * as Fields from '../fields/index'
 import type { IJsonItem, INodeData, ITaskData } from '../types'
 
@@ -31,8 +30,6 @@ export function useConditions({
   readonly?: boolean
   data?: ITaskData
 }) {
-  const { t } = useI18n()
-  const taskCodeOptions = ref([] as { label: string; value: number }[])
   const model = reactive({
     taskType: 'CONDITIONS',
     name: '',
@@ -44,11 +41,12 @@ export function useConditions({
     failRetryInterval: 1,
     failRetryTimes: 0,
     workerGroup: 'default',
-    delayTime: 0,
     timeout: 30,
     relation: 'AND',
     dependTaskList: [],
-    preTasks: []
+    preTasks: [],
+    successNode: 'success',
+    failedNode: 'failed'
   } as INodeData)
 
   let extra: IJsonItem[] = []
@@ -60,26 +58,10 @@ export function useConditions({
         projectCode,
         isCreate: !data?.id,
         from,
-        processName: data?.processName,
-        code: data?.code
+        processName: data?.processName
       })
     ]
   }
-
-  watch(
-    () => model.preTasks,
-    () => {
-      taskCodeOptions.value =
-        model.preTaskOptions
-          ?.filter((task: { code: number }) =>
-            model.preTasks?.includes(task.code)
-          )
-          .map((task: { code: number; name: string }) => ({
-            value: task.code,
-            label: task.name
-          })) || []
-    }
-  )
 
   return {
     json: [
@@ -92,41 +74,8 @@ export function useConditions({
       Fields.useEnvironmentName(model, !data?.id),
       ...Fields.useTaskGroup(model, projectCode),
       ...Fields.useFailed(),
-      Fields.useDelayTime(model),
-      ...Fields.useTimeoutAlarm(model),
-      ...Fields.useRelationCustomParams({
-        model,
-        children: {
-          type: 'custom-parameters',
-          field: 'dependItemList',
-          span: 18,
-          children: [
-            {
-              type: 'select',
-              field: 'depTaskCode',
-              span: 10,
-              options: taskCodeOptions
-            },
-            {
-              type: 'select',
-              field: 'status',
-              span: 10,
-              options: [
-                {
-                  value: 'SUCCESS',
-                  label: t('project.node.success')
-                },
-                {
-                  value: 'FAILURE',
-                  label: t('project.node.failed')
-                }
-              ]
-            }
-          ]
-        },
-        childrenField: 'dependItemList'
-      }),
-      Fields.usePreTasks(model)
+      ...Fields.useConditions(model),
+      Fields.usePreTasks()
     ] as IJsonItem[],
     model
   }

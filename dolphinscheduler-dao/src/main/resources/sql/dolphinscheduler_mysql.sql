@@ -279,13 +279,21 @@ DROP TABLE IF EXISTS `t_ds_alert`;
 CREATE TABLE `t_ds_alert` (
   `id` int(11) NOT NULL AUTO_INCREMENT COMMENT 'key',
   `title` varchar(64) DEFAULT NULL COMMENT 'title',
+  `sign` char(40) NOT NULL DEFAULT '' COMMENT 'sign=sha1(content)',
   `content` text COMMENT 'Message content (can be email, can be SMS. Mail is stored in JSON map, and SMS is string)',
   `alert_status` tinyint(4) DEFAULT '0' COMMENT '0:wait running,1:success,2:failed',
+  `warning_type` tinyint(4) DEFAULT '2' COMMENT '1 process is successfully, 2 process/task is failed',
   `log` text COMMENT 'log',
   `alertgroup_id` int(11) DEFAULT NULL COMMENT 'alert group id',
   `create_time` datetime DEFAULT NULL COMMENT 'create time',
   `update_time` datetime DEFAULT NULL COMMENT 'update time',
-  PRIMARY KEY (`id`)
+  `project_code` bigint(20) DEFAULT NULL COMMENT 'project_code',
+  `process_definition_code` bigint(20) DEFAULT NULL COMMENT 'process_definition_code',
+  `process_instance_id` int(11) DEFAULT NULL COMMENT 'process_instance_id',
+  `alert_type` int(11) DEFAULT NULL COMMENT 'alert_type',
+  PRIMARY KEY (`id`),
+  KEY `idx_status` (`alert_status`) USING BTREE,
+  KEY `idx_sign` (`sign`) USING BTREE
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 -- ----------------------------
@@ -755,7 +763,7 @@ CREATE TABLE `t_ds_resources` (
   `create_time` datetime DEFAULT NULL COMMENT 'create time',
   `update_time` datetime DEFAULT NULL COMMENT 'update time',
   `pid` int(11) DEFAULT NULL,
-  `full_name` varchar(64) DEFAULT NULL,
+  `full_name` varchar(128) DEFAULT NULL,
   `is_directory` tinyint(4) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `t_ds_resources_un` (`full_name`,`type`)
@@ -1895,3 +1903,19 @@ CREATE TABLE `t_ds_k8s_namespace` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `k8s_namespace_unique` (`namespace`,`k8s`)
 ) ENGINE= INNODB AUTO_INCREMENT= 1 DEFAULT CHARSET= utf8;
+
+
+-- ----------------------------
+-- Table structure for t_ds_alert_send_status
+-- ----------------------------
+DROP TABLE IF EXISTS t_ds_alert_send_status;
+CREATE TABLE t_ds_alert_send_status (
+  `id`                            int(11) NOT NULL AUTO_INCREMENT,
+  `alert_id`                      int(11) NOT NULL,
+  `alert_plugin_instance_id`      int(11) NOT NULL,
+  `send_status`                   tinyint(4) DEFAULT '0',
+  `log`                           text,
+  `create_time`                   datetime DEFAULT NULL COMMENT 'create time',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `alert_send_status_unique` (`alert_id`,`alert_plugin_instance_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;

@@ -17,10 +17,11 @@
 
 import { h, unref } from 'vue'
 import { NRadio, NRadioGroup, NSpace } from 'naive-ui'
+import { isFunction } from 'lodash'
 import type { IJsonItem, IOption } from '../types'
 
 export function renderRadio(item: IJsonItem, fields: { [field: string]: any }) {
-  const { props, field, options } = item
+  const { props, field, options } = isFunction(item) ? item() : item
   if (!options) {
     return h(NRadio, {
       ...props,
@@ -31,8 +32,9 @@ export function renderRadio(item: IJsonItem, fields: { [field: string]: any }) {
   return h(
     NRadioGroup,
     {
+      ...props,
       value: fields[field],
-      onUpdateValue: (value) => void (fields[field] = value)
+      onUpdateValue: (value: any) => void (fields[field] = value)
     },
     () =>
       h(NSpace, null, () =>
